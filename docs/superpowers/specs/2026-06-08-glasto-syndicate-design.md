@@ -12,7 +12,8 @@ bought twice, ticket slots get wasted, and nobody has a live view of who is cove
 
 This app replaces the spreadsheets with a hosted website that does:
 
-- Random assignment of members into groups of up to 6.
+- Pre-sale assignment of members into fixed groups of up to 6 — arranged manually to keep
+  friends together, or via a one-press randomise.
 - Live, concurrency-safe reshuffling on sale day so whoever gets through buys for the
   right people — with **zero double-buys** and **zero wasted ticket slots**.
 - Fast copy-paste of each person's registration details at checkout.
@@ -35,7 +36,8 @@ available allow, with no slot wasted on a double-buy and no manual spreadsheet w
 ### Concepts
 
 - **Syndicate** — a group running a buy. Has a name, a join code/link, a status
-  (`setup` → `live` → `closed`), and a frozen random-order seed set when locked for sale.
+  (`setup` → `live` → `closed`), and a group layout that is frozen (along with its derived
+  global order) when locked for sale.
 - **Member** — a person: first name, last name, **registration number**, **postcode**,
   and a per-device claim token (their no-password identity). Belongs to one syndicate.
 - **Unit** — the groupable thing, either:
@@ -65,16 +67,35 @@ Three tiers:
   stores a claim token (their no-password identity). Trust-based, appropriate for a group
   of friends.
 
-## 4. The Fixed Order & Grouping
+## 4. Group Layout & The Fixed Order
 
-When the organiser **locks the syndicate for sale**:
+Groups are **arranged before the sale** by the **organiser or the super admin**, and once
+locked they **stay fixed**. The layout exists primarily to keep groups of friends
+together.
 
-1. Units are shuffled **once** into a frozen global order (seeded, reproducible).
-2. Groups are formed by walking that order and packing units up to 6 **without ever
-   splitting a pair**. A group may therefore close at **5** if the next unit is a pair
-   that won't fit. Groups are "up to 6", not always exactly 6.
-3. Groups are a **planning/preview view** for members. The live claim engine works off
-   the flat ordered list, not rigid group boundaries.
+### Arranging groups (pre-sale)
+
+- **Manual assignment** — drag members/units into groups of up to 6 and order the groups.
+  The UI **keeps pairs together** (a pair always lands in one group as a 2-slot unit) and
+  warns if a layout is invalid (group over 6, a pair split).
+- **Randomise button** — produces a layout automatically using the agreed algorithm:
+  shuffle units, then pack them into groups of up to 6 **without ever splitting a pair**
+  (a group may close at **5** if the next unit is a pair that won't fit). Randomise can be
+  pressed any number of times before lock; it overwrites the current layout.
+- Either approach can be used and then hand-tweaked.
+
+### The fixed order
+
+The chosen layout defines the **fixed global priority order**: group 1's members in order,
+then group 2's, and so on. This single ordered list is what the live claim engine walks
+for top-ups (§5).
+
+### Locking
+
+When the organiser **locks the syndicate for sale**, the layout and its derived order are
+**frozen** and status moves to `live`. Groups are no longer editable. During the live sale
+the groups are a fixed planning view; the claim engine works off the frozen flat order,
+crossing group boundaries when topping up.
 
 ## 5. The Claim Engine (critical, concurrency-safe core)
 
@@ -138,9 +159,11 @@ instantly for all members. No manual refresh.
 ## 7. Screens
 
 1. **Super-admin console** (authenticated login) → provision a new syndicate, issue its
-   organiser link, view all syndicates, and override/force-release locks.
+   organiser link, view all syndicates, arrange any syndicate's groups, and
+   override/force-release locks.
 2. **Organiser dashboard** (via organiser link) → name the syndicate, manage the roster,
-   share the member join link, and **"Lock for sale"** (freezes the order → status `live`).
+   share the member join link, **arrange groups** (drag members into groups + **Randomise**
+   button, pairs kept together), and **"Lock for sale"** (freezes layout/order → `live`).
 3. **Join** → enter first/last name, registration number, postcode; choose **individual**
    or **pair** (pair links a partner). Browser stores claim token.
 4. **Pre-sale member dashboard** → roster, your unit, **pair/unpair** control, preview of
@@ -158,7 +181,9 @@ instantly for all members. No manual refresh.
 - **Rejected release** — people return to original priority position.
 - **Unpair anytime** — splits into two individuals at the same positions.
 - **Leftover single slot vs. a pair** — skip the pair, fill with next fitting individual.
-- **Groups smaller than 6** — pairs never split across a group boundary.
+- **Groups smaller than 6** — pairs never split across a group boundary (manual or random).
+- **Invalid manual layout** — UI blocks/warns on a group over 6 or a split pair.
+- **Layout frozen on lock** — groups become immutable once the sale is live.
 - **Member already covered when group-mate buys** — skipped; slot tops up from the order.
 - **Repeat buys** — a member may buy multiple sets of 6, unlimited until all covered.
 - **Buyer drops offline mid-lock** — manual release by the buyer, or **super-admin
@@ -197,7 +222,10 @@ The claim engine is the risk centre and is built **test-first**. Automated tests
   in correct priority order.
 - **Repeat buys** — a single buyer can claim multiple sets; unlimited until covered.
 - **Termination** — engine reaches "everyone covered" correctly and stops.
-- **Grouping** — pairs never straddle a group boundary; groups may be size 5.
+- **Grouping** — randomise never straddles a pair across a group boundary; groups may be
+  size 5. Manual layout rejects invalid arrangements. Locked layout is immutable.
+- **Order derivation** — the frozen global order matches group sequence then within-group
+  order, and the engine tops up across group boundaries in that order.
 - **Detail exposure** — server only returns copyable reg/postcode for the requester's own
   active lock; never for other people's locks or covered members.
 - **Super-admin override** — force-release resets state atomically and broadcasts live.
